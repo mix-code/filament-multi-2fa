@@ -1,0 +1,5 @@
+# Ignore email templates
+resources/views/email/**
+resources/views/emails/**
+# resources/views/components/mail-template-themes/**
+resources/views/vendor/mail/**

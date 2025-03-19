@@ -1,6 +1,6 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace MixCode\FilamentMulti2fa;
 
 use Filament\Support\Assets\AlpineComponent;
 use Filament\Support\Assets\Asset;
@@ -10,17 +10,16 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
+use MixCode\FilamentMulti2fa\Testing\TestsFilamentMulti2fa;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use VendorName\Skeleton\Commands\SkeletonCommand;
-use VendorName\Skeleton\Testing\TestsSkeleton;
 
-class SkeletonServiceProvider extends PackageServiceProvider
+class FilamentMulti2faServiceProvider extends PackageServiceProvider
 {
-    public static string $name = 'skeleton';
+    public static string $name = 'filament-multi-2fa';
 
-    public static string $viewNamespace = 'skeleton';
+    public static string $viewNamespace = 'filament-multi-2fa';
 
     public function configurePackage(Package $package): void
     {
@@ -36,7 +35,7 @@ class SkeletonServiceProvider extends PackageServiceProvider
                     ->publishConfigFile()
                     ->publishMigrations()
                     ->askToRunMigrations()
-                    ->askToStarRepoOnGitHub(':vendor_slug/:package_slug');
+                    ->askToStarRepoOnGitHub('mix-code/filament-multi-2fa');
             });
 
         $configFileName = $package->shortName();
@@ -80,18 +79,18 @@ class SkeletonServiceProvider extends PackageServiceProvider
         if (app()->runningInConsole()) {
             foreach (app(Filesystem::class)->files(__DIR__ . '/../stubs/') as $file) {
                 $this->publishes([
-                    $file->getRealPath() => base_path("stubs/skeleton/{$file->getFilename()}"),
-                ], 'skeleton-stubs');
+                    $file->getRealPath() => base_path("stubs/filament-multi-2fa/{$file->getFilename()}"),
+                ], 'filament-multi-2fa-stubs');
             }
         }
 
         // Testing
-        Testable::mixin(new TestsSkeleton);
+        Testable::mixin(new TestsFilamentMulti2fa);
     }
 
     protected function getAssetPackageName(): ?string
     {
-        return ':vendor_slug/:package_slug';
+        return 'mix-code/filament-multi-2fa';
     }
 
     /**
@@ -100,9 +99,9 @@ class SkeletonServiceProvider extends PackageServiceProvider
     protected function getAssets(): array
     {
         return [
-            // AlpineComponent::make('skeleton', __DIR__ . '/../resources/dist/components/skeleton.js'),
-            Css::make('skeleton-styles', __DIR__ . '/../resources/dist/skeleton.css'),
-            Js::make('skeleton-scripts', __DIR__ . '/../resources/dist/skeleton.js'),
+            // AlpineComponent::make('filament-multi-2fa', __DIR__ . '/../resources/dist/components/filament-multi-2fa.js'),
+            // Css::make('filament-multi-2fa-styles', __DIR__ . '/../resources/dist/filament-multi-2fa.css'),
+            // Js::make('filament-multi-2fa-scripts', __DIR__ . '/../resources/dist/filament-multi-2fa.js'),
         ];
     }
 
@@ -111,9 +110,7 @@ class SkeletonServiceProvider extends PackageServiceProvider
      */
     protected function getCommands(): array
     {
-        return [
-            SkeletonCommand::class,
-        ];
+        return [];
     }
 
     /**
@@ -146,7 +143,8 @@ class SkeletonServiceProvider extends PackageServiceProvider
     protected function getMigrations(): array
     {
         return [
-            'create_skeleton_table',
+            'add_two_factor_columns_to_users_table',
+            'create_trust_devices_table',
         ];
     }
 }
