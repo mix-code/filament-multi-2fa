@@ -66,9 +66,9 @@ trait UsingTwoFA
         $this->trustedDevices()->create([
             'device_name' => $request->header('User-Agent'),
             'device_signature' => $signature,
-            'expires_at' => now()->addDays(30),
+            'expires_at' => now()->addMinutes(config('filament-multi-2fa.trusted_device_db_expiration') ?? 60 * 24 * 30),
         ]);
 
-        cookie()->queue(config('filament-multi-2fa.trusted_device_cookie_name'), $signature, 60 * 24 * 30);
+        cookie()->queue(config('filament-multi-2fa.trusted_device_cookie_name'), $signature, config('filament-multi-2fa.cookie_lifespan') ?? 60 * 24 * 30);
     }
 }

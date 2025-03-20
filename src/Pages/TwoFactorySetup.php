@@ -21,6 +21,7 @@ use Filament\Support\Exceptions\Halt;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
+use Livewire\Attributes\Locked;
 use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 use MixCode\FilamentMulti2fa\FilamentMulti2faPlugin;
 use PragmaRX\Google2FA\Google2FA;
@@ -32,6 +33,9 @@ class TwoFactorySetup extends Page implements HasForms
     use HasTopbar;
     use InteractsWithForms;
 
+    #[Locked]
+    public $user;
+
     protected static string $layout = 'filament-panels::components.layout.simple';
 
     protected static bool $shouldRegisterNavigation = false;
@@ -40,10 +44,14 @@ class TwoFactorySetup extends Page implements HasForms
 
     protected static string $view = 'filament-multi-2fa::pages.two-factory-setup';
 
-    public ?array $data = [
-        'two_factor_type' => TwoFactorAuthType::None->value,
-        'trust_device' => true,
-    ];
+    public ?array $data = ['trust_device' => true];
+
+    public function mount()
+    {
+        $this->user = auth()->user();
+
+        $this->data['two_factor_type'] = $this->user->two_factor_type?->value ?? TwoFactorAuthType::None->value;
+    }
 
     public bool $showSetupForm = true;
 
@@ -53,17 +61,27 @@ class TwoFactorySetup extends Page implements HasForms
 
     public static function getModelLabel(): string
     {
-        return trans('filament-multi-2fa::filament-multi-2fa.setup');
+        return trans('filament-multi-2fa::filament-multi-2fa.two_factor_setup_intro2');
     }
 
     public static function getNavigationLabel(): string
     {
-        return trans('filament-multi-2fa::filament-multi-2fa.setup');
+        return trans('filament-multi-2fa::filament-multi-2fa.two_factor_setup_intro2');
     }
 
     public function getTitle(): string
     {
-        return trans('filament-multi-2fa::filament-multi-2fa.setup');
+        return trans('filament-multi-2fa::filament-multi-2fa.2fa_setup');
+    }
+
+    public function getHeading(): string | Htmlable
+    {
+        return trans('filament-multi-2fa::filament-multi-2fa.two_factor_setup_intro');
+    }
+
+    public function getSubheading(): string | Htmlable | null
+    {
+        return trans('filament-multi-2fa::filament-multi-2fa.two_factor_setup_intro2');
     }
 
     protected function getForms(): array
@@ -81,17 +99,67 @@ class TwoFactorySetup extends Page implements HasForms
             ->schema([
                 ToggleButtons::make('two_factor_type')
                     ->label(trans('filament-multi-2fa::filament-multi-2fa.two_factor_type'))
-                    ->options(TwoFactorAuthType::class)
+                    ->options(function () {
+                        $forceSetup = FilamentMulti2faPlugin::get()->getForceSetup2fa();
+
+                        return collect(TwoFactorAuthType::cases())
+                            ->filter(function ($type) use ($forceSetup) {
+                                if ($type === TwoFactorAuthType::None) {
+                                    return ! $forceSetup; // Only show None when force setup is off
+                                }
+
+                                return true;
+                            })
+                            ->mapWithKeys(function ($type) {
+                                return [$type->value => $type->getLabel()];
+                            })
+                            ->toArray();
+                    })
+                    ->colors(
+                        fn () => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn ($type) => [$type->value => $type->getColor()])
+                            ->toArray()
+                    )
+                    ->icons(
+                        fn () => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn ($type) => [$type->value => $type->getIcon()])
+                            ->toArray()
+                    )
+                    ->disableOptionWhen(function (string $value) {
+                        $forceSetup = FilamentMulti2faPlugin::get()->getForceSetup2fa();
+                        $currentValue = $this->user->two_factor_type?->value;
+
+                        // Disable 'None' if 2FA is forced
+                        if ($value === TwoFactorAuthType::None->value) {
+                            return $forceSetup;
+                        }
+
+                        // Disable already active 2FA type
+                        return $value === $currentValue;
+                    })
+                    ->rule(function (?string $state) {
+                        $forceSetup = FilamentMulti2faPlugin::get()->getForceSetup2fa();
+                        $currentValue = $this->user->two_factor_type?->value;
+
+                        return function (string $attribute, mixed $value, Closure $fail) use ($state, $forceSetup, $currentValue) {
+                            if ($state === TwoFactorAuthType::None->value && $forceSetup) {
+                                $fail(trans('filament-multi-2fa::filament-multi-2fa.must_setup_2fa'));
+                            }
+
+                            if ($state !== TwoFactorAuthType::None->value && $state === $currentValue) {
+                                $fail(trans('filament-multi-2fa::filament-multi-2fa.verified_before'));
+                            }
+                        };
+                    })
                     ->inline()
                     ->required(),
+
             ])
             ->statePath('data');
     }
 
     public function verifyOTPForm(Form $form): Form
     {
-        $user = auth()->user();
-
         return $form
             ->schema([
                 Placeholder::make('otp_sent')
@@ -102,19 +170,18 @@ class TwoFactorySetup extends Page implements HasForms
                     ->label(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->placeholder(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->required()
-                    ->live()
                     ->maxLength(191)
                     ->default(null)
-                    ->rule(static function (?string $state, Get $get): Closure {
-                        return static function (string $attribute, mixed $value, Closure $fail) use ($state) {
-                            if (! auth()->user()->verifyOTP($state)) {
+                    ->rule(function (?string $state, Get $get): Closure {
+                        return function (string $attribute, mixed $value, Closure $fail) use ($state) {
+                            if (! $this->user->verifyOTP($state)) {
                                 $fail(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'));
                             }
                         };
                     })
-                    ->hint(static function () use ($user) {
-                        if ($user->two_factor_expires_at && now()->lt($user->two_factor_expires_at)) {
-                            $remainsDiff = now()->diff($user->two_factor_expires_at);
+                    ->hint(function () {
+                        if ($this->user->two_factor_expires_at && now()->lt($this->user->two_factor_expires_at)) {
+                            $remainsDiff = now()->diff($this->user->two_factor_expires_at);
                             $remains = $remainsDiff->format('%i');
 
                             if ($remains < 1) {
@@ -130,13 +197,13 @@ class TwoFactorySetup extends Page implements HasForms
                         Action::make('resendOtp')
                             ->label(fn () => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
                             ->hidden(
-                                fn () => is_null($user->two_factor_expires_at) || now()->lt($user->two_factor_expires_at)
+                                fn () => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
                             )
                             ->icon('heroicon-o-arrow-path')
                             ->disabled(
-                                fn () => is_null($user->two_factor_expires_at) || now()->lt($user->two_factor_expires_at)
+                                fn () => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
                             )
-                            ->action(fn () => $user->generateTwoFactorOTPCode(force: true))
+                            ->action(fn () => $this->user->generateTwoFactorOTPCode(force: true))
                     ),
 
                 Radio::make('trust_device')
@@ -149,18 +216,16 @@ class TwoFactorySetup extends Page implements HasForms
 
     public function verifyTOTPForm(Form $form): Form
     {
-        $user = auth()->user();
-
         return $form
             ->schema([
                 Placeholder::make('qr_code')
                     ->hiddenLabel()
-                    ->content(function () use ($user): ?Htmlable {
+                    ->content(function (): ?Htmlable {
                         if ($this->data['two_factor_type'] === TwoFactorAuthType::Totp->value) {
                             $QRImage = (new Google2FAQRCode)->getQRCodeInline(
                                 config('app.name'),
-                                $user->email,
-                                $user->two_factor_secret,
+                                $this->user->email,
+                                $this->user->two_factor_secret,
                             );
 
                             return new HtmlString('<div class="flex justify-center">' . $QRImage . '</div>');
@@ -173,12 +238,11 @@ class TwoFactorySetup extends Page implements HasForms
                     ->label(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->placeholder(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->required()
-                    ->live()
                     ->maxLength(191)
                     ->default(null)
-                    ->rule(static function (?string $state, Get $get): Closure {
-                        return static function (string $attribute, mixed $value, Closure $fail) use ($state) {
-                            if (! (new Google2FA)->verifyKey(auth()->user()->two_factor_secret, $state)) {
+                    ->rule(function (?string $state, Get $get): Closure {
+                        return function (string $attribute, mixed $value, Closure $fail) use ($state) {
+                            if (! (new Google2FA)->verifyKey($this->user->two_factor_secret, $state)) {
                                 $fail(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'));
                             }
                         };
@@ -198,6 +262,14 @@ class TwoFactorySetup extends Page implements HasForms
             Action::make('setup')
                 ->label(trans('filament-multi-2fa::filament-multi-2fa.setup'))
                 ->submit('setup'),
+
+            Action::make('cancel')
+                ->label(trans('filament-multi-2fa::filament-multi-2fa.cancel'))
+                ->color('danger')
+                ->action('goAwaySetup')
+                ->hidden(function () {
+                    return FilamentMulti2faPlugin::get()->getForceSetup2fa() && $this->user->two_factor_type?->value === TwoFactorAuthType::None->value;
+                }),
         ];
     }
 
@@ -233,28 +305,48 @@ class TwoFactorySetup extends Page implements HasForms
     {
         $this->setupForm->validate();
 
-        $user = auth()->user();
+        if ($this->data['two_factor_type'] !== TwoFactorAuthType::None->value && $this->data['two_factor_type'] === $this->user->two_factor_type?->value) {
+            Notification::make()
+                ->danger()
+                ->title(trans('filament-multi-2fa::filament-multi-2fa.verified_before'))
+                ->send();
+
+            return;
+        }
+
+        if ($this->data['two_factor_type'] === TwoFactorAuthType::None->value && FilamentMulti2faPlugin::get()->getForceSetup2fa()) {
+            Notification::make()
+                ->danger()
+                ->title(trans('filament-multi-2fa::filament-multi-2fa.must_setup_2fa'))
+                ->send();
+
+            return;
+        }
 
         if ($this->data['two_factor_type'] == TwoFactorAuthType::Email->value) {
-            $user->generateTwoFactorOTPCode();
+            $this->user->generateTwoFactorOTPCode();
             $this->showSetupForm = false;
             $this->showVerifyOTPForm = true;
             $this->showVerifyTOTPForm = false;
         } elseif ($this->data['two_factor_type'] == TwoFactorAuthType::Totp->value) {
-            $user->generateTwoFactorAuthenticatorAppOTPCode();
+            $this->user->generateTwoFactorAuthenticatorAppOTPCode();
             $this->showSetupForm = false;
             $this->showVerifyOTPForm = false;
             $this->showVerifyTOTPForm = true;
         } else {
             $this->cancel();
 
-            $user->two_factor_type = TwoFactorAuthType::None->value;
-            $user->two_factor_secret = null;
-            $user->two_factor_confirmed_at = null;
-            $user->two_factor_expires_at = null;
-            $user->save();
+            $this->user->two_factor_type = TwoFactorAuthType::None->value;
+            $this->user->two_factor_secret = null;
+            $this->user->two_factor_confirmed_at = null;
+            $this->user->two_factor_expires_at = null;
+            $this->user->save();
 
-            $user->trustedDevices()->delete();
+            $this->user->trustedDevices()->delete();
+
+            session()->forget('trusted_device_validated');
+
+            redirect($this->getRedirectUrl());
         }
     }
 
@@ -263,26 +355,24 @@ class TwoFactorySetup extends Page implements HasForms
         try {
             $this->verifyOTPForm->validate();
 
-            $user = auth()->user();
-
-            if (! $user->verifyOTP($this->data['otp'])) {
+            if (! $this->user->verifyOTP($this->data['otp'])) {
                 Notification::make()
                     ->danger()
                     ->title(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'))
                     ->send();
 
-                $this->halt();
+                return;
             }
 
-            DB::transaction(function () use ($user) {
-                $user->two_factor_secret = null;
-                $user->two_factor_type = TwoFactorAuthType::Email->value;
-                $user->two_factor_expires_at = null;
-                $user->two_factor_confirmed_at = now();
-                $user->save();
+            DB::transaction(function () {
+                $this->user->two_factor_secret = null;
+                $this->user->two_factor_type = TwoFactorAuthType::Email->value;
+                $this->user->two_factor_expires_at = null;
+                $this->user->two_factor_confirmed_at = now();
+                $this->user->save();
 
                 if (isset($this->data['trust_device']) && $this->data['trust_device'] && $this->data['two_factor_type'] !== TwoFactorAuthType::None->value) {
-                    $user->addTrustedDevice();
+                    $this->user->addTrustedDevice();
                 }
             });
         } catch (Halt $exception) {
@@ -301,27 +391,25 @@ class TwoFactorySetup extends Page implements HasForms
     {
         try {
             $this->verifyTOTPForm->validate();
-
-            $user = auth()->user();
-
-            if (! (new Google2FA)->verifyKey($user->two_factor_secret, $this->data['otp'])) {
+            if (! (new Google2FA)->verifyKey($this->user->two_factor_secret, $this->data['otp'])) {
                 Notification::make()
                     ->danger()
                     ->title(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'))
                     ->send();
 
-                $this->halt();
+                return;
             }
 
-            DB::transaction(function () use ($user) {
-                $user->two_factor_secret = null;
-                $user->two_factor_type = TwoFactorAuthType::Totp->value;
-                $user->two_factor_expires_at = null;
-                $user->two_factor_confirmed_at = now();
-                $user->save();
+            DB::transaction(function () {
+                // Never reset $this->user->two_factor_secret
+
+                $this->user->two_factor_type = TwoFactorAuthType::Totp->value;
+                $this->user->two_factor_expires_at = null;
+                $this->user->two_factor_confirmed_at = now();
+                $this->user->save();
 
                 if (isset($this->data['trust_device']) && $this->data['trust_device'] && $this->data['two_factor_type'] !== TwoFactorAuthType::None->value) {
-                    $user->addTrustedDevice();
+                    $this->user->addTrustedDevice();
                 }
             });
         } catch (Halt $exception) {
@@ -336,6 +424,11 @@ class TwoFactorySetup extends Page implements HasForms
         redirect($this->getRedirectUrl());
     }
 
+    public function goAwaySetup()
+    {
+        redirect($this->getRedirectUrl());
+    }
+
     public function cancel()
     {
         $this->showSetupForm = true;
@@ -346,7 +439,7 @@ class TwoFactorySetup extends Page implements HasForms
     protected function getRedirectUrl(): string
     {
 
-        return auth()->user()->redirectAfterVerifyUrl() ?? FilamentMulti2faPlugin::get()->redirectAfterVerifyUrl();
+        return $this->user->redirectAfterVerifyUrl() ?? FilamentMulti2faPlugin::get()->redirectAfterVerifyUrl();
     }
 
     protected function getLayoutData(): array
@@ -364,12 +457,12 @@ class TwoFactorySetup extends Page implements HasForms
 
     protected function hasFullWidthVerifyOTPFormActions(): bool
     {
-        return false;
+        return true;
     }
 
     protected function hasFullWidthVerifyTOTPFormActions(): bool
     {
-        return false;
+        return true;
     }
 
     public function hasLogo(): bool

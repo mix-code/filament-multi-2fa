@@ -4,7 +4,6 @@ namespace MixCode\FilamentMulti2fa\Pages;
 
 use Closure;
 use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -45,12 +44,31 @@ class OTPVerify extends Page implements HasForms
         return trans('filament-multi-2fa::filament-multi-2fa.verify');
     }
 
+    public function getSubheading(): string | Htmlable | null
+    {
+        $user = auth()->user();
+
+        if ($user->two_factor_type?->value === TwoFactorAuthType::Email->value) {
+            return trans('filament-multi-2fa::filament-multi-2fa.otp_has_sent_to_your_email');
+        }
+
+        if ($user->two_factor_type?->value === TwoFactorAuthType::Totp->value) {
+            return trans('filament-multi-2fa::filament-multi-2fa.get_otp_from_authenticator_app');
+        }
+
+        return null;
+    }
+
     public function mount()
     {
         $user = auth()->user();
 
         if ($user->two_factor_type->value == TwoFactorAuthType::Email->value) {
             $user->generateTwoFactorOTPCode();
+        }
+
+        if ($user->two_factor_type->value == TwoFactorAuthType::None->value) {
+            redirect($this->getRedirectUrl());
         }
     }
 
@@ -61,21 +79,10 @@ class OTPVerify extends Page implements HasForms
 
         return $form
             ->schema([
-                Placeholder::make('otp_sent')
-                    ->hiddenLabel()
-                    ->content(trans('filament-multi-2fa::filament-multi-2fa.otp_has_sent_to_your_email'))
-                    ->visible($user->two_factor_type->value === TwoFactorAuthType::Email->value),
-
-                Placeholder::make('get_otp_from_authenticator_app')
-                    ->hiddenLabel()
-                    ->content(trans('filament-multi-2fa::filament-multi-2fa.get_otp_from_authenticator_app'))
-                    ->visible($user->two_factor_type->value === TwoFactorAuthType::Totp->value),
-
                 TextInput::make('otp')
                     ->label(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->placeholder(trans('filament-multi-2fa::filament-multi-2fa.otp'))
                     ->required()
-                    ->live()
                     ->maxLength(191)
                     ->default(null)
                     ->rule(static function (?string $state) use ($user): Closure {

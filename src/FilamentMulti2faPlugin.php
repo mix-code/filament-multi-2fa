@@ -3,7 +3,10 @@
 namespace MixCode\FilamentMulti2fa;
 
 use Filament\Contracts\Plugin;
+use Filament\Navigation\MenuItem;
 use Filament\Panel;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
 use MixCode\FilamentMulti2fa\Middleware\CheckTrustedDevice;
 use MixCode\FilamentMulti2fa\Pages\OTPVerify;
 use MixCode\FilamentMulti2fa\Pages\TwoFactorySetup;
@@ -24,6 +27,13 @@ class FilamentMulti2faPlugin implements Plugin
                 OTPVerify::class,
                 TwoFactorySetup::class,
             ])
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label(fn (): string => trans('filament-multi-2fa::filament-multi-2fa.2fa_setup'))
+                    ->url(fn (): string => TwoFactorySetup::getUrl())
+                    ->icon('heroicon-o-lock-closed')
+                    ->color('danger'),
+            ])
             ->authMiddleware([
                 CheckTrustedDevice::class,
             ]);
@@ -31,7 +41,14 @@ class FilamentMulti2faPlugin implements Plugin
 
     public function boot(Panel $panel): void
     {
-        //
+        Event::listen(Logout::class, function ($event) {
+            $user = $event->user;
+
+            if ($user) {
+                $user->two_factor_confirmed_at = null;
+                $user->save();
+            }
+        });
     }
 
     public function forceSetup2fa(bool $state = true): static

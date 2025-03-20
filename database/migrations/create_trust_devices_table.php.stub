@@ -15,10 +15,13 @@ return new class extends Migration
             $table->id();
 
             $table->string('device_name');
-            $table->string('device_signature'); // Unique hash per device
+            $table->string('device_signature')->index(); // Unique hash per device
             $table->timestamp('expires_at');
 
             $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+
+            $table->index(['user_id', 'device_signature']);
+            $table->index(['user_id', 'device_signature', 'expires_at']);
 
             $table->timestamps();
         });
