@@ -1,6 +1,6 @@
 # Filament Multi 2FA
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/mix-code/filament-multi-2fa.svg?style=flat-square)](https://packagist.org/packages/mix-code/filament-multi-2fa)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mix-code/filament-multi-2fa?style=flat-square)](https://packagist.org/packages/mix-code/filament-multi-2fa)
 
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/mix-code/filament-multi-2fa/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/mix-code/filament-multi-2fa/actions?query=workflow%3Arun-tests+branch%3Amain)
 
