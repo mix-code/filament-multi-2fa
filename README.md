@@ -68,14 +68,27 @@ public function panel(Panel $panel): Panel
 
 ### 2️⃣ Configure User Model
 
-In your `User` model, use the `UsingTwoFA` trait:
+In your `User` model, use the `UsingTwoFA` trait, guarded attributes and casts:
 
 ```php
 use MixCode\FilamentMulti2fa\Traits\UsingTwoFA;
+use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 
 class User extends Authenticatable
 {
     use UsingTwoFA;
+
+    protected $guarded = [
+        'two_factor_type',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_expires_at',
+        'two_factor_confirmed_at',
+    ];
+
+    protected $casts = [
+        'two_factor_type' => TwoFactorAuthType::class,
+    ];
 
     // ...
 }
