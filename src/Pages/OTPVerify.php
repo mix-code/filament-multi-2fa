@@ -10,8 +10,6 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
-use Filament\Pages\Concerns\HasMaxWidth;
-use Filament\Pages\Concerns\HasTopbar;
 use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Support\Exceptions\Halt;
@@ -22,8 +20,6 @@ use PragmaRX\Google2FA\Google2FA;
 
 class OTPVerify extends Page implements HasForms
 {
-    use HasMaxWidth;
-    use HasTopbar;
     use InteractsWithForms;
 
     protected static string $layout = 'filament-panels::components.layout.simple';

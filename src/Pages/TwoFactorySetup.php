@@ -13,8 +13,6 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
-use Filament\Pages\Concerns\HasMaxWidth;
-use Filament\Pages\Concerns\HasTopbar;
 use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Support\Exceptions\Halt;
@@ -29,8 +27,6 @@ use PragmaRX\Google2FAQRCode\Google2FA as Google2FAQRCode;
 
 class TwoFactorySetup extends Page implements HasForms
 {
-    use HasMaxWidth;
-    use HasTopbar;
     use InteractsWithForms;
 
     #[Locked]
