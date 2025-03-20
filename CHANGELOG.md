@@ -6,6 +6,6 @@ All notable changes to `filament-multi-2fa` will be documented in this file.
 
 **Full Changelog**: https://github.com/mix-code/filament-multi-2fa/commits/v1.0.0
 
-## 1.0.0 - 202X-XX-XX
+## 1.0.0 - 2025-03-20
 
-- initial release
+-   initial release
