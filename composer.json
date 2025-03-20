@@ -17,6 +17,11 @@
             "name": "Mohamed Alaa El-Din",
             "email": "moaalaa16@gmail.com",
             "role": "Developer"
+        },
+        {
+            "name": "Hamza Omar Mohamed",
+            "email": "hamzalilomar92@gmail.com",
+            "role": "Developer"
         }
     ],
     "require": {
