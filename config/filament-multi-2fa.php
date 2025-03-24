@@ -34,7 +34,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Choose the QR code rendering service to generate the QR Code for TOTP.
-    | 
+    |
     | Supported Services:
     |
     | 1. BaconQrCode (default):
@@ -72,7 +72,7 @@ return [
     | Trusted Device Settings
     |--------------------------------------------------------------------------
     |
-    | Configure trusted device cookie settings, including cookie name, 
+    | Configure trusted device cookie settings, including cookie name,
     | lifespan in minutes, and cache settings to minimize DB hits.
     |
     */

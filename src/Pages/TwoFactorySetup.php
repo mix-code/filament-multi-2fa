@@ -24,7 +24,6 @@ use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 use MixCode\FilamentMulti2fa\FilamentMulti2faPlugin;
 use PragmaRX\Google2FA\Google2FA;
 use PragmaRX\Google2FAQRCode\Google2FA as Google2FAQRCode;
-use PragmaRX\Google2FAQRCode\QRCode\Bacon;
 use PragmaRX\Google2FAQRCode\QRCode\Chillerlan;
 
 class TwoFactorySetup extends Page implements HasForms
@@ -114,13 +113,13 @@ class TwoFactorySetup extends Page implements HasForms
                             ->toArray();
                     })
                     ->colors(
-                        fn() => collect(TwoFactorAuthType::cases())
-                            ->mapWithKeys(fn($type) => [$type->value => $type->getColor()])
+                        fn () => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn ($type) => [$type->value => $type->getColor()])
                             ->toArray()
                     )
                     ->icons(
-                        fn() => collect(TwoFactorAuthType::cases())
-                            ->mapWithKeys(fn($type) => [$type->value => $type->getIcon()])
+                        fn () => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn ($type) => [$type->value => $type->getIcon()])
                             ->toArray()
                     )
                     ->disableOptionWhen(function (string $value) {
@@ -193,11 +192,11 @@ class TwoFactorySetup extends Page implements HasForms
                     })
                     ->hintAction(
                         Action::make('resendOtp')
-                            ->label(fn() => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
+                            ->label(fn () => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
                             ->hidden($this->canResendOTP())
                             ->icon('heroicon-o-arrow-path')
                             ->disabled($this->canResendOTP())
-                            ->action(fn() => $this->user->generateTwoFactorOTPCode(force: true))
+                            ->action(fn () => $this->user->generateTwoFactorOTPCode(force: true))
                     ),
 
                 Radio::make('trust_device')
@@ -218,7 +217,7 @@ class TwoFactorySetup extends Page implements HasForms
                         if ($this->data['two_factor_type'] === TwoFactorAuthType::Totp->value) {
                             $qrCodeBackendService = config('filament-multi-2fa.qr_code_backend_service');
 
-                            $qrCodeService = new $qrCodeBackendService();
+                            $qrCodeService = new $qrCodeBackendService;
 
                             $QRImage = (new Google2FAQRCode)
                                 ->setQrCodeService($qrCodeService)
