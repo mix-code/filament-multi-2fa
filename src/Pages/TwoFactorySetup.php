@@ -24,6 +24,8 @@ use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 use MixCode\FilamentMulti2fa\FilamentMulti2faPlugin;
 use PragmaRX\Google2FA\Google2FA;
 use PragmaRX\Google2FAQRCode\Google2FA as Google2FAQRCode;
+use PragmaRX\Google2FAQRCode\QRCode\Bacon;
+use PragmaRX\Google2FAQRCode\QRCode\Chillerlan;
 
 class TwoFactorySetup extends Page implements HasForms
 {
@@ -112,13 +114,13 @@ class TwoFactorySetup extends Page implements HasForms
                             ->toArray();
                     })
                     ->colors(
-                        fn () => collect(TwoFactorAuthType::cases())
-                            ->mapWithKeys(fn ($type) => [$type->value => $type->getColor()])
+                        fn() => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn($type) => [$type->value => $type->getColor()])
                             ->toArray()
                     )
                     ->icons(
-                        fn () => collect(TwoFactorAuthType::cases())
-                            ->mapWithKeys(fn ($type) => [$type->value => $type->getIcon()])
+                        fn() => collect(TwoFactorAuthType::cases())
+                            ->mapWithKeys(fn($type) => [$type->value => $type->getIcon()])
                             ->toArray()
                     )
                     ->disableOptionWhen(function (string $value) {
@@ -191,15 +193,15 @@ class TwoFactorySetup extends Page implements HasForms
                     })
                     ->hintAction(
                         Action::make('resendOtp')
-                            ->label(fn () => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
+                            ->label(fn() => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
                             ->hidden(
-                                fn () => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
+                                fn() => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
                             )
                             ->icon('heroicon-o-arrow-path')
                             ->disabled(
-                                fn () => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
+                                fn() => is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at)
                             )
-                            ->action(fn () => $this->user->generateTwoFactorOTPCode(force: true))
+                            ->action(fn() => $this->user->generateTwoFactorOTPCode(force: true))
                     ),
 
                 Radio::make('trust_device')
@@ -218,11 +220,21 @@ class TwoFactorySetup extends Page implements HasForms
                     ->hiddenLabel()
                     ->content(function (): ?Htmlable {
                         if ($this->data['two_factor_type'] === TwoFactorAuthType::Totp->value) {
-                            $QRImage = (new Google2FAQRCode)->getQRCodeInline(
-                                config('app.name'),
-                                $this->user->email,
-                                $this->user->two_factor_secret,
-                            );
+                            $qrCodeBackendService = config('filament-multi-2fa.qr_code_backend_service');
+
+                            $qrCodeService = new $qrCodeBackendService();
+
+                            $QRImage = (new Google2FAQRCode)
+                                ->setQrCodeService($qrCodeService)
+                                ->getQRCodeInline(
+                                    config('app.name'),
+                                    $this->user->email,
+                                    $this->user->two_factor_secret,
+                                );
+
+                            if ($qrCodeService instanceof Chillerlan) {
+                                $QRImage = '<img src="' . $QRImage . '" />';
+                            }
 
                             return new HtmlString('<div class="flex justify-center">' . $QRImage . '</div>');
                         }

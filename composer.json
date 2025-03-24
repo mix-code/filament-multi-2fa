@@ -27,6 +27,7 @@
     "require": {
         "php": "^8.1",
         "bacon/bacon-qr-code": "^3.0",
+        "chillerlan/php-qrcode": "^5.0",
         "filament/filament": "^3.0",
         "pragmarx/google2fa": "^8.0",
         "pragmarx/google2fa-qrcode": "^3.0",
@@ -75,5 +76,6 @@
         }
     },
     "minimum-stability": "dev",
+    "version": "0.0.1",
     "prefer-stable": true
 }
