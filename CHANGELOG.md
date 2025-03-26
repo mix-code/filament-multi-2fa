@@ -2,6 +2,12 @@
 
 All notable changes to `filament-multi-2fa` will be documented in this file.
 
+## v1.2.0 - 2025-03-26
+
+Adding `two_factor_sent_at` column to users table
+
+**Full Changelog**: https://github.com/mix-code/filament-multi-2fa/compare/v1.1.0...v1.2.0
+
 ## v1.1.0 - 2025-03-24
 
 - Adding Support for multiple QRCode backend Services
