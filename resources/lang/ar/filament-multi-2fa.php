@@ -23,6 +23,7 @@ return [
     'get_otp_from_authenticator_app' => 'احصل على رمز التحقق من تطبيق المصادقة',
     'resend_otp' => 'إعادة إرسال رمز التحقق',
     'resend_available_in' => 'يمكنك إعادة إرسال رمز التحقق بعد :minutes دقيقة/دقائق',
+    'resend_available_in_seconds' => 'يمكنك إعادة إرسال رمز التحقق بعد :seconds ثانية/ثواني',
     'resend_available_in_less_than_minute' => 'يمكنك إعادة إرسال رمز التحقق في أقل من دقيقة',
     'cancel' => 'إلغاء',
 ];

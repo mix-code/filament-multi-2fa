@@ -1,4 +1,4 @@
-<div wire:poll.1m>
+<div wire:poll.1s>
     <x-filament-panels::page.simple>
 
         <x-filament-panels::form id="form" wire:submit="save">

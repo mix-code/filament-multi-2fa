@@ -17,18 +17,28 @@ trait UsingTwoFA
         return null;
     }
 
-    public function generateTwoFactorOTPCode(bool $force = false): static
+    public function generateTwoFactorOTPCode(): static
     {
-        if (! $this->two_factor_expires_at || now()->gt($this->two_factor_expires_at) || $force) {
-            // Only generate new OTP if expired
-            $this->two_factor_secret = encrypt(random_int(100000, 999999));
-            $this->two_factor_expires_at = now()->addMinutes(10);
-            $this->two_factor_confirmed_at = null;
+        // If an OTP exists and is still valid, return the same instance without regenerating
+        if ($this->two_factor_sent_at && now()->lt($this->two_factor_expires_at)) {
+
+            $this->two_factor_sent_at = now();
             $this->save();
 
-            // Automatically send new OTP
             $this->sendTwoFactorOTPCodeNotification();
+
+            return $this;
         }
+
+        // Generate a new OTP code if expired, not sent before, or forced
+        $this->two_factor_secret = encrypt(random_int(100000, 999999));
+        $this->two_factor_sent_at = now();
+        $this->two_factor_expires_at = now()->addSeconds(config('filament-multi-2fa.otp_expiration_in_seconds'));
+        $this->two_factor_confirmed_at = null;
+        $this->save();
+
+        // Automatically send the new OTP
+        $this->sendTwoFactorOTPCodeNotification();
 
         return $this;
     }

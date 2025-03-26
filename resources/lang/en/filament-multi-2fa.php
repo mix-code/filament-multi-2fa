@@ -22,7 +22,8 @@ return [
     'otp_has_sent_to_your_email' => 'An OTP has been sent to your email.',
     'get_otp_from_authenticator_app' => 'Get OTP From Authenticator App',
     'resend_otp' => 'Resend OTP',
-    'resend_available_in' => 'You can resend OTP in :minutes minutes',
+    'resend_available_in' => 'You can resend OTP in :minutes minute/minutes',
+    'resend_available_in_seconds' => 'You can resend OTP in :seconds second/seconds',
     'resend_available_in_less_than_minute' => 'You can resend OTP in less than a minute',
     'cancel' => 'Cancel',
 ];

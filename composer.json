@@ -76,5 +76,6 @@
         }
     },
     "minimum-stability": "stable",
+    "version": "0.0.1",
     "prefer-stable": true
 }

@@ -177,17 +177,23 @@ class TwoFactorySetup extends Page implements HasForms
                         };
                     })
                     ->hint(function () {
-                        if ($this->user->two_factor_expires_at && now()->lt($this->user->two_factor_expires_at)) {
-                            $remainsDiff = now()->diff($this->user->two_factor_expires_at);
-                            $remains = $remainsDiff->format('%i');
+                        if ((bool) $this->user->two_factor_sent_at) {
+                            $sentAtDateTime = $this->user->two_factor_sent_at->addSeconds(config('filament-multi-2fa.otp_resend_allowed_after_in_seconds'));
 
-                            if ($remains < 1) {
-                                return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in_less_than_minute');
+                            if ($sentAtDateTime->greaterThan(now())) {
+                                $remainsDiff = $sentAtDateTime->diff(now());
+                                $remains = $remainsDiff->format(config('filament-multi-2fa.otp_resend_time_format'));
+
+                                if ($remains < 1) {
+                                    return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in_seconds', [
+                                        'seconds' => $remains,
+                                    ]);
+                                }
+
+                                return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in', [
+                                    'minutes' => $remains,
+                                ]);
                             }
-
-                            return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in', [
-                                'minutes' => $remains,
-                            ]);
                         }
                     })
                     ->hintAction(
@@ -196,7 +202,7 @@ class TwoFactorySetup extends Page implements HasForms
                             ->hidden($this->canResendOTP())
                             ->icon('heroicon-o-arrow-path')
                             ->disabled($this->canResendOTP())
-                            ->action(fn () => $this->user->generateTwoFactorOTPCode(force: true))
+                            ->action(fn () => $this->user->generateTwoFactorOTPCode())
                     ),
 
                 Radio::make('trust_device')
@@ -361,12 +367,15 @@ class TwoFactorySetup extends Page implements HasForms
             DB::transaction(function () {
                 $this->user->two_factor_secret = null;
                 $this->user->two_factor_type = TwoFactorAuthType::Email->value;
+                $this->user->two_factor_sent_at = null;
                 $this->user->two_factor_expires_at = null;
                 $this->user->two_factor_confirmed_at = now();
                 $this->user->save();
 
                 if ($this->shouldTrustDevice()) {
                     $this->user->addTrustedDevice();
+                } else {
+                    $this->user->trustedDevices()->delete();
                 }
             });
         } catch (Halt $exception) {
@@ -454,7 +463,9 @@ class TwoFactorySetup extends Page implements HasForms
 
     protected function canResendOTP(): bool
     {
-        return is_null($this->user->two_factor_expires_at) || now()->lt($this->user->two_factor_expires_at);
+        return is_null($this->user->two_factor_sent_at) || $this->user->two_factor_sent_at
+            ->addSeconds(config('filament-multi-2fa.otp_resend_allowed_after_in_seconds'))
+            ->greaterThan(now());
     }
 
     protected function getLayoutData(): array

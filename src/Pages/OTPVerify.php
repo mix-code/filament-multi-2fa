@@ -14,6 +14,7 @@ use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Contracts\Support\Htmlable;
+use Livewire\Attributes\Locked;
 use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 use MixCode\FilamentMulti2fa\FilamentMulti2faPlugin;
 use PragmaRX\Google2FA\Google2FA;
@@ -30,10 +31,26 @@ class OTPVerify extends Page implements HasForms
 
     protected static string $view = 'filament-multi-2fa::pages.otp-verify';
 
+    #[Locked]
+    public $user;
+
     public ?array $data = [
         'two_factor_type' => TwoFactorAuthType::None,
         'trust_device' => true,
     ];
+
+    public function mount()
+    {
+        $this->user = auth()->user();
+
+        if ($this->user->two_factor_type->value == TwoFactorAuthType::Email->value) {
+            $this->user->generateTwoFactorOTPCode();
+        }
+
+        if ($this->user->two_factor_type->value == TwoFactorAuthType::None->value) {
+            redirect($this->getRedirectUrl());
+        }
+    }
 
     public function getTitle(): string | Htmlable
     {
@@ -42,37 +59,19 @@ class OTPVerify extends Page implements HasForms
 
     public function getSubheading(): string | Htmlable | null
     {
-        $user = auth()->user();
-
-        if ($user->two_factor_type?->value === TwoFactorAuthType::Email->value) {
+        if ($this->user->two_factor_type?->value === TwoFactorAuthType::Email->value) {
             return trans('filament-multi-2fa::filament-multi-2fa.otp_has_sent_to_your_email');
         }
 
-        if ($user->two_factor_type?->value === TwoFactorAuthType::Totp->value) {
+        if ($this->user->two_factor_type?->value === TwoFactorAuthType::Totp->value) {
             return trans('filament-multi-2fa::filament-multi-2fa.get_otp_from_authenticator_app');
         }
 
         return null;
     }
 
-    public function mount()
-    {
-        $user = auth()->user();
-
-        if ($user->two_factor_type->value == TwoFactorAuthType::Email->value) {
-            $user->generateTwoFactorOTPCode();
-        }
-
-        if ($user->two_factor_type->value == TwoFactorAuthType::None->value) {
-            redirect($this->getRedirectUrl());
-        }
-    }
-
     public function form(Form $form): Form
     {
-
-        $user = auth()->user();
-
         return $form
             ->schema([
                 TextInput::make('otp')
@@ -81,46 +80,48 @@ class OTPVerify extends Page implements HasForms
                     ->required()
                     ->maxLength(191)
                     ->default(null)
-                    ->rule(static function (?string $state) use ($user): Closure {
-                        return static function (string $attribute, mixed $value, Closure $fail) use ($state, $user) {
-                            if ($user->two_factor_type->value === TwoFactorAuthType::Totp->value) {
-                                if (! (new Google2FA)->verifyKey($user->two_factor_secret, $state)) {
+                    ->rule(function (?string $state): Closure {
+                        return function (string $attribute, mixed $value, Closure $fail) use ($state) {
+                            if ($this->user->two_factor_type->value === TwoFactorAuthType::Totp->value) {
+                                if (! (new Google2FA)->verifyKey($this->user->two_factor_secret, $state)) {
                                     $fail(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'));
                                 }
                             }
 
-                            if ($user->two_factor_type->value === TwoFactorAuthType::Email->value) {
-                                if (! $user->verifyOTP($state)) {
+                            if ($this->user->two_factor_type->value === TwoFactorAuthType::Email->value) {
+                                if (! $this->user->verifyOTP($state)) {
                                     $fail(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'));
                                 }
                             }
                         };
                     })
-                    ->hint(static function () use ($user) {
-                        if ($user->two_factor_expires_at && now()->lt($user->two_factor_expires_at)) {
-                            $remainsDiff = now()->diff($user->two_factor_expires_at);
-                            $remains = $remainsDiff->format('%i');
+                    ->hint(function () {
+                        if ((bool) $this->user->two_factor_sent_at) {
+                            $sentAtDateTime = $this->user->two_factor_sent_at->addSeconds(config('filament-multi-2fa.otp_resend_allowed_after_in_seconds'));
 
-                            if ($remains < 1) {
-                                return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in_less_than_minute');
+                            if ($sentAtDateTime->greaterThan(now())) {
+                                $remainsDiff = $sentAtDateTime->diff(now());
+                                $remains = $remainsDiff->format(config('filament-multi-2fa.otp_resend_time_format'));
+
+                                if ($remains < 1) {
+                                    return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in_seconds', [
+                                        'seconds' => $remains,
+                                    ]);
+                                }
+
+                                return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in', [
+                                    'minutes' => $remains,
+                                ]);
                             }
-
-                            return trans('filament-multi-2fa::filament-multi-2fa.resend_available_in', [
-                                'minutes' => $remains,
-                            ]);
                         }
                     })
                     ->hintAction(
                         Action::make('resendOtp')
                             ->label(fn () => trans('filament-multi-2fa::filament-multi-2fa.resend_otp'))
-                            ->hidden(
-                                fn () => is_null($user->two_factor_expires_at) || now()->lt($user->two_factor_expires_at)
-                            )
+                            ->hidden($this->canResendOTP())
                             ->icon('heroicon-o-arrow-path')
-                            ->disabled(
-                                fn () => is_null($user->two_factor_expires_at) || now()->lt($user->two_factor_expires_at)
-                            )
-                            ->action(fn () => $user->generateTwoFactorOTPCode(force: true))
+                            ->disabled($this->canResendOTP())
+                            ->action(fn () => $this->user->generateTwoFactorOTPCode())
                     ),
 
                 Radio::make('trust_device')
@@ -146,10 +147,8 @@ class OTPVerify extends Page implements HasForms
         try {
             $data = $this->form->getState();
 
-            $user = auth()->user();
-
-            if ($user->two_factor_type->value === TwoFactorAuthType::Email->value) {
-                if (! $user->verifyOTP($data['otp'])) {
+            if ($this->user->two_factor_type->value === TwoFactorAuthType::Email->value) {
+                if (! $this->user->verifyOTP($data['otp'])) {
                     Notification::make()
                         ->danger()
                         ->title(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'))
@@ -158,12 +157,12 @@ class OTPVerify extends Page implements HasForms
                     $this->halt();
                 }
 
-                $user->two_factor_confirmed_at = now();
-                $user->two_factor_secret = null; // Must not be deleted in Totp
+                $this->user->two_factor_confirmed_at = now();
+                $this->user->two_factor_secret = null; // Must not be deleted in Totp
             }
 
-            if ($user->two_factor_type->value === TwoFactorAuthType::Totp->value) {
-                if (! (new Google2FA)->verifyKey($user->two_factor_secret, $data['otp'])) {
+            if ($this->user->two_factor_type->value === TwoFactorAuthType::Totp->value) {
+                if (! (new Google2FA)->verifyKey($this->user->two_factor_secret, $data['otp'])) {
                     Notification::make()
                         ->danger()
                         ->title(trans('filament-multi-2fa::filament-multi-2fa.wrong_otp'))
@@ -172,14 +171,17 @@ class OTPVerify extends Page implements HasForms
                     $this->halt();
                 }
 
-                $user->two_factor_confirmed_at = now();
+                $this->user->two_factor_confirmed_at = now();
             }
 
-            $user->two_factor_expires_at = null;
-            $user->save();
+            $this->user->two_factor_sent_at = null;
+            $this->user->two_factor_expires_at = null;
+            $this->user->save();
 
-            if (isset($data['trust_device']) && $data['trust_device'] && $user->two_factor_type->value !== TwoFactorAuthType::None->value) {
-                $user->addTrustedDevice();
+            if ($this->shouldTrustDevice()) {
+                $this->user->addTrustedDevice();
+            } else {
+                $this->user->trustedDevices()->delete();
             }
         } catch (Halt $exception) {
             return;
@@ -197,6 +199,18 @@ class OTPVerify extends Page implements HasForms
     {
 
         return auth()->user()->redirectAfterVerifyUrl() ?? FilamentMulti2faPlugin::get()->redirectAfterVerifyUrl();
+    }
+
+    protected function shouldTrustDevice(): bool
+    {
+        return ($this->data['trust_device'] ?? false) && $this->user->two_factor_type->value !== TwoFactorAuthType::None->value;
+    }
+
+    protected function canResendOTP(): bool
+    {
+        return is_null($this->user->two_factor_sent_at) || $this->user->two_factor_sent_at
+            ->addSeconds(config('filament-multi-2fa.otp_resend_allowed_after_in_seconds'))
+            ->greaterThan(now());
     }
 
     protected function getLayoutData(): array

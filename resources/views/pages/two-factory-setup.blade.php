@@ -9,7 +9,7 @@
     @endif
 
     @if ($showVerifyOTPForm)
-        <div wire:poll.1m>
+        <div wire:poll.1s>
             <x-filament-panels::form id="verify-otp-form" wire:submit="verifyOTP">
                 {{ $this->verifyOTPForm }}
 
