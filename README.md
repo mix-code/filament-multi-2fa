@@ -82,12 +82,16 @@ class User extends Authenticatable
         'two_factor_type',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'two_factor_sent_at',
         'two_factor_expires_at',
         'two_factor_confirmed_at',
     ];
 
     protected $casts = [
         'two_factor_type' => TwoFactorAuthType::class,
+        'two_factor_sent_at' => 'datetime',
+        'two_factor_expires_at' => 'datetime',
+        'two_factor_confirmed_at' => 'datetime',
     ];
 
     // ...
@@ -134,8 +138,6 @@ Event::listen(Logout::class, function ($event) {
 ### 5️⃣ Customize settings from the config file
 
 ```php
-<?php
-
 return [
 
     /*
@@ -194,14 +196,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | OTP View Template
+    | OTP Settings
     |--------------------------------------------------------------------------
     |
-    | Specify the Blade view that will be used for rendering the OTP email.
+    | OTP Specific Settings From the view of the notification to the resend remains.
     |
     */
 
     'otp_view' => 'filament-multi-2fa::emails.2fa.otp',
+
+    'otp_resend_time_format' => '%i:%S', // 1:15
+
+    'otp_resend_allowed_after_in_seconds' => 60 * 1, // 1 Minute
+
+    'otp_expiration_in_seconds' => 60 * 10,   // 10 Minute
 
     /*
     |--------------------------------------------------------------------------
