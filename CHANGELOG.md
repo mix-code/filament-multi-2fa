@@ -2,6 +2,18 @@
 
 All notable changes to `filament-multi-2fa` will be documented in this file.
 
+## v1.3.0 - 2025-05-21
+
+### What's Changed
+
+* Fixing Multi Device Support by @moaalaa in https://github.com/mix-code/filament-multi-2fa/pull/2
+
+### New Contributors
+
+* @moaalaa made their first contribution in https://github.com/mix-code/filament-multi-2fa/pull/2
+
+**Full Changelog**: https://github.com/mix-code/filament-multi-2fa/compare/v1.2.1...v1.3.0
+
 ## v1.2.1 - 2025-03-26
 
 **Full Changelog**: https://github.com/mix-code/filament-multi-2fa/compare/v1.2.0...v1.2.1
