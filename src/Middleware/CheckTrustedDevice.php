@@ -31,22 +31,17 @@ class CheckTrustedDevice
 
         $requires2FA = $user->two_factor_type?->value !== TwoFactorAuthType::None->value;
 
-        // If 2FA is enforced globally (e.g., admin setting)
-        if ($is2FAForced) {
-            if (! $requires2FA && ! $request->routeIs(TwoFactorySetup::getRouteName())) {
+        if (($is2FAForced || $requires2FA) && ! $user->hasSetupTwoFactor()) {
+            if (! $request->routeIs(TwoFactorySetup::getRouteName())) {
                 return redirect()->route(TwoFactorySetup::getRouteName());
-            }
-
-            if ($requires2FA && ! $user->two_factor_confirmed_at) {
-                if (! $this->checkTrusted($request, $trustDeviceModel, $user)) {
-                    return $this->handleOtpRedirect($request, $next);
-                }
             }
         }
 
-        // Optional mode: if user enabled 2FA on their own
-        if (! $is2FAForced && $requires2FA && ! $user->two_factor_confirmed_at) {
-            if (! $this->checkTrusted($request, $trustDeviceModel, $user)) {
+        if (($is2FAForced || $requires2FA) && $user->hasSetupTwoFactor()) {
+            $trusted = $this->checkTrusted($request, $trustDeviceModel, $user);
+            $otpSessionConfirmed = $user->isOtpPassed();
+
+            if (! $trusted && ! $otpSessionConfirmed) {
                 return $this->handleOtpRedirect($request, $next);
             }
         }

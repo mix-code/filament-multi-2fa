@@ -3,6 +3,7 @@
 namespace MixCode\FilamentMulti2fa\Traits;
 
 use Illuminate\Support\Facades\Notification;
+use MixCode\FilamentMulti2fa\Enums\TwoFactorAuthType;
 use PragmaRX\Google2FA\Google2FA;
 
 trait UsingTwoFA
@@ -65,6 +66,16 @@ trait UsingTwoFA
     public function verifyOTP($code): bool
     {
         return decrypt($this->two_factor_secret) == $code && now()->lt($this->two_factor_expires_at);
+    }
+
+    public function hasSetupTwoFactor(): bool
+    {
+        return $this->two_factor_type->value !== TwoFactorAuthType::None->value;
+    }
+
+    public function isOtpPassed(): bool
+    {
+        return session('2fa_passed') === true;
     }
 
     public function addTrustedDevice()
