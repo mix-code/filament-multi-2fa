@@ -178,10 +178,10 @@ class OTPVerify extends Page implements HasForms
             $this->user->two_factor_expires_at = null;
             $this->user->save();
 
+            session(['2fa_passed' => true]);
+
             if ($this->shouldTrustDevice()) {
                 $this->user->addTrustedDevice();
-            } else {
-                $this->user->trustedDevices()->delete();
             }
         } catch (Halt $exception) {
             return;
